@@ -4,4 +4,3 @@
 .Ruserdata
 images*
 *.DS_Store
-data/*.gpkg
