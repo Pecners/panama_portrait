@@ -10,17 +10,13 @@ library(MetBrewer)
 library(NatParksPalettes)
 library(rnaturalearth)
 
-# Set map name that will be used in file names, and 
-# to get get boundaries from master NPS list
 
 map <- "panama"
 
 # Kontur data source: https://data.humdata.org/organization/kontur
 d <- st_read("data/kontur_population_PA_20220630.gpkg")
 
-bb <- st_bbox(d) |> 
-  st_as_sfc(crs = st_crs(d))
-
+# Get coastline data to add country/coastline borders
 address <- "https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/physical/ne_10m_land.zip"
 destdir <- tempdir()
 utils::download.file(file.path(address), zip_file <- tempfile())
@@ -34,10 +30,12 @@ panama <- ne_countries(scale = "large", returnclass = "sf") |>
 
 st_p <- st_intersection(panama, land)
 
-st_p |> 
-  ggplot() +
-  geom_sf()
+# st_p |> 
+#   ggplot() +
+#   geom_sf()
 
+# Cast the borders to a linestring and buffer so lines
+# show up on map.
 st_buff <- st_p |> 
   st_cast("MULTILINESTRING") |> 
   st_buffer(250, endCapStyle = "FLAT", joinStyle = "MITRE") |> 
@@ -45,10 +43,11 @@ st_buff <- st_p |>
   mutate(population = 1) |> 
   st_transform(crs = 5469)
 
-st_buff |> 
-  ggplot() +
-  geom_sf()
+# st_buff |> 
+#   ggplot() +
+#   geom_sf()
 
+# Combine border and Kontur data
 st_d_land <- bind_rows(st_buff, 
                        st_transform(d, crs = 5469) |> 
                          mutate(geometry = geom)) |> 
@@ -62,7 +61,7 @@ st_d_land <- bind_rows(st_buff,
 
 st_dd <- st_transform(st_d_land, crs = 5469)
 
-# Add graticules 
+# Create graticules 
 
 longs <- map_df(c(-82, -80, -78), function(i) {
   tibble(x = i,
@@ -90,26 +89,28 @@ lats <- map_df(c(7.5, 9.5), function(i) {
 
 grid <- bind_rows(lats, longs)
 
-grid |> 
-  ggplot() +
-  geom_sf() +
-  geom_sf(data = st_dd)
+# grid |> 
+#   ggplot() +
+#   geom_sf() +
+#   geom_sf(data = st_dd)
 
 
-land |> 
-  ggplot() +
-  geom_sf()
+# land |> 
+#   ggplot() +
+#   geom_sf()
 
+# Combine with other data
 
 st_d <- grid |> 
   tibble() |> 
   st_as_sf(crs = 5469) |> 
   bind_rows(st_dd)
 
-st_d |> 
-  ggplot() +
-  geom_sf()
+# st_d |> 
+#   ggplot() +
+#   geom_sf()
 
+# Set up bounding box to get dimensions
 bb <- st_bbox(st_d)
 yind <- st_distance(st_point(c(bb[["xmin"]], bb[["ymin"]])), 
                     st_point(c(bb[["xmin"]], bb[["ymax"]])))
@@ -124,6 +125,8 @@ if (yind > xind) {
   y_rat <- yind / xind
 }
 
+# Cast sf data to raster then matrix (I'm not sure
+# how to go directly to a matrix)
 size <- 10000
 rast <- st_rasterize(st_d |> 
                        select(population, geom),
